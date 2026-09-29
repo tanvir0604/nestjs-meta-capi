@@ -59,8 +59,28 @@ jobs:
       # NOTE: trusted publishing generally cannot create a *brand-new* package
       # name. Perform the initial publish once out-of-band (or configure a
       # pending trusted publisher on npm) before relying on this workflow.
+      # Trusted publishing uses the OIDC token from `id-token: write`. The npm
+      # error is surfaced as a check annotation because annotations are readable
+      # without repository access, unlike step logs.
       - name: Publish via Trusted Publishing
-        run: npm publish --access public
+        run: |
+          set +e
+          npm publish --access public > /tmp/publish.log 2>&1
+          status=$?
+          cat /tmp/publish.log
+          if [ "$status" -ne 0 ]; then
+            npmrc="(no ~/.npmrc)"
+            if [ -f "$HOME/.npmrc" ]; then
+              npmrc=$(sed -E 's/(_authToken=).*/\1<redacted>/' "$HOME/.npmrc" | tr '\n' '; ')
+            fi
+            oidc="no"
+            [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && oidc="yes"
+            reason=$(grep -iE '^npm (error|notice)' /tmp/publish.log | head -8 | tr '\n' '; ')
+            detail="npm=$(npm --version) node=$(node --version) oidc-env=${oidc} npmrc=${npmrc} :: ${reason}"
+            detail=$(printf '%s' "$detail" | sed 's/%/%25/g' | tr -d '\r')
+            echo "::error title=npm publish failed::${detail}"
+            exit "$status"
+          fi
 
       - name: Create the GitHub Release
         env:
