@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-29
+
 ### Added
 
 - `MetaCapiModule.forRoot()` and `MetaCapiModule.forRootAsync()` with fail-fast configuration
@@ -27,4 +29,5 @@ All notable changes to this project are documented here. The format is based on
 - Express and Fastify integration tests.
 - A compile-checked example app under `examples/basic`.
 
-[Unreleased]: https://github.com/tanvir0604/nestjs-meta-capi/commits/main
+[Unreleased]: https://github.com/tanvir0604/nestjs-meta-capi/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tanvir0604/nestjs-meta-capi/releases/tag/v1.0.0
