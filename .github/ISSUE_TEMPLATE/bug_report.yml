@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible problem with nestjs-meta-capi.
+labels: ['bug', 'triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. **Do not include access tokens, app
+        secrets, or raw customer PII** (email, phone, name) anywhere in this report.
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: nestjs
+    attributes:
+      label: NestJS and Node versions
+      placeholder: '@nestjs/common 12.1.1, Node 22.11.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: HTTP adapter
+      options:
+        - Express
+        - Fastify
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the observed behaviour and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: A small, self-contained snippet or repository that reproduces the issue.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact tokens and PII first. Log lines from the package are safe to paste.
+      render: shell
+    validations:
+      required: false

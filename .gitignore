@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+.DS_Store
+*.tsbuildinfo
+
+# Local editor/tool state (machine-specific permission grants and preferences).
+.commandcode/

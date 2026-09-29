@@ -1,0 +1,2142 @@
+# Build a Professional NestJS Meta Conversions API Integration Package
+
+## 1. Project Objective
+
+Build a production-quality open-source npm package that provides an idiomatic NestJS integration for Meta's Conversions API.
+
+The package must use Meta's official Node.js Business SDK internally rather than reimplementing the Meta Conversions API protocol.
+
+The purpose of this package is to provide a clean NestJS developer experience around:
+
+* Meta Conversions API
+* multiple Meta datasets/pixels
+* NestJS dependency injection
+* dynamic modules
+* decorators
+* interceptors
+* request-context extraction
+* event ID/deduplication
+* user-data mapping
+* custom-data mapping
+* asynchronous event delivery
+* optional queue support
+* error handling
+* retries
+* test events
+* structured logging
+* TypeScript type safety
+* unit/integration testing
+* GitHub CI
+* automatic npm publishing
+* npm provenance
+* semantic versioning
+
+The package should feel like a package designed specifically for NestJS, not simply a renamed wrapper around Meta's Node.js SDK.
+
+---
+
+# 2. Core Design Principle
+
+The architecture must follow this separation:
+
+```text
+NestJS Application
+       │
+       ▼
+NestJS Meta Integration
+       │
+       ├── Decorators
+       ├── Interceptors
+       ├── DI
+       ├── Dataset configuration
+       ├── Request context
+       ├── Event mapping
+       ├── Retry/queue abstraction
+       └── Logging
+       │
+       ▼
+Meta Official Node.js Business SDK
+       │
+       ▼
+Meta Conversions API
+```
+
+Do NOT duplicate Meta's API implementation.
+
+Do NOT directly call Meta's Graph API unless absolutely necessary for functionality unavailable through the official SDK.
+
+The official SDK must remain the underlying Meta API implementation.
+
+---
+
+# 3. Package Naming
+
+Use a professional package name.
+
+Preferred candidate:
+
+```text
+@<organization>/nestjs-meta-capi
+```
+
+If an organization scope is not available, use:
+
+```text
+nestjs-meta-capi
+```
+
+Before finalizing the name, check npm availability.
+
+The package description should clearly communicate:
+
+> Idiomatic NestJS integration for Meta Conversions API, powered by Meta's official Node.js Business SDK.
+
+Use keywords such as:
+
+```text
+nestjs
+nest
+nestjs-module
+meta
+facebook
+conversions-api
+capi
+facebook-conversions-api
+meta-capi
+typescript
+```
+
+---
+
+# 4. Supported Runtime
+
+Target modern Node.js.
+
+Minimum:
+
+```text
+Node.js >= 20
+```
+
+Prefer compatibility with current LTS versions.
+
+The implementation must be TypeScript-first.
+
+Use strict TypeScript configuration:
+
+```json
+{
+  "compilerOptions": {
+    "strict": true
+  }
+}
+```
+
+Avoid `any` unless there is a documented and unavoidable reason.
+
+---
+
+# 5. Framework Compatibility
+
+Target modern NestJS.
+
+The package must work with:
+
+* Express adapter
+* Fastify adapter
+
+Do not make Express-specific assumptions.
+
+The Meta official SDK supports NestJS request context. Use its request-context facilities rather than manually duplicating Meta's parameter extraction logic. The SDK can populate values such as `fbc`, `fbp`, client IP, referrer URL and event source URL from the incoming request.
+
+---
+
+# 6. Installation
+
+The user experience should be:
+
+```bash
+npm install @<organization>/nestjs-meta-capi
+```
+
+The package should expose a simple public API.
+
+Example:
+
+```ts
+import {
+  MetaCapiModule,
+  MetaEvent,
+} from '@<organization>/nestjs-meta-capi';
+```
+
+---
+
+# 7. Dynamic Module
+
+Implement:
+
+```ts
+MetaCapiModule.forRoot(...)
+```
+
+and:
+
+```ts
+MetaCapiModule.forRootAsync(...)
+```
+
+Example:
+
+```ts
+@Module({
+  imports: [
+    MetaCapiModule.forRoot({
+      datasets: {
+        tutoria: {
+          datasetId: process.env.META_TUTORIA_DATASET_ID!,
+          accessToken: process.env.META_TUTORIA_ACCESS_TOKEN!,
+        },
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Also support:
+
+```ts
+MetaCapiModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config: ConfigService) => ({
+    datasets: {
+      tutoria: {
+        datasetId: config.getOrThrow<string>('META_TUTORIA_DATASET_ID'),
+        accessToken: config.getOrThrow<string>('META_TUTORIA_ACCESS_TOKEN'),
+      },
+    },
+  }),
+})
+```
+
+Use NestJS dynamic module patterns correctly.
+
+---
+
+# 8. Multiple Dataset Support
+
+Multiple Meta datasets must be a first-class feature.
+
+Example:
+
+```ts
+datasets: {
+  tutoria: {
+    datasetId: '123',
+    accessToken: 'token-a',
+  },
+
+  marketing: {
+    datasetId: '456',
+    accessToken: 'token-b',
+  },
+
+  partner: {
+    datasetId: '789',
+    accessToken: 'token-c',
+  },
+}
+```
+
+The package must never assume there is only one dataset.
+
+Every event must resolve a dataset through one of these mechanisms:
+
+1. method-level dataset
+2. controller-level dataset
+3. module/application default dataset
+4. explicit service call
+
+Resolution order:
+
+```text
+Method
+  ↓
+Controller
+  ↓
+Default
+```
+
+If no dataset can be resolved, fail clearly with a descriptive configuration error.
+
+---
+
+# 9. Dataset Decorator
+
+Implement:
+
+```ts
+@MetaDataset('tutoria')
+```
+
+It should be usable on a controller:
+
+```ts
+@MetaDataset('tutoria')
+@Controller('leads')
+export class LeadController {}
+```
+
+It should also be usable on a specific method:
+
+```ts
+@MetaDataset('marketing')
+@Post('/purchase')
+purchase() {}
+```
+
+Method-level configuration overrides controller-level configuration.
+
+---
+
+# 10. Main Event Decorator
+
+Implement:
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+})
+```
+
+Example:
+
+```ts
+@Post('/leads')
+@MetaEvent({
+  name: 'Lead',
+})
+async createLead(@Body() dto: CreateLeadDto) {
+  return this.leadService.create(dto);
+}
+```
+
+The decorator itself MUST NOT send the Meta event.
+
+It should only attach metadata.
+
+The actual event lifecycle must be handled by an interceptor.
+
+This distinction is critical.
+
+---
+
+# 11. Event Lifecycle
+
+The event must be sent only after successful handler execution.
+
+Correct:
+
+```text
+Request
+   ↓
+NestJS guards/pipes
+   ↓
+Controller method
+   ↓
+Business logic
+   ↓
+Successful result
+   ↓
+Meta event
+```
+
+Incorrect:
+
+```text
+Request
+   ↓
+Meta event
+   ↓
+Controller method
+```
+
+If the controller throws an exception, the Meta event must NOT be sent.
+
+NestJS interceptors are specifically designed to execute logic before/after method execution and to transform results/exceptions, making them the appropriate mechanism for this behavior.
+
+---
+
+# 12. Meta Event Interceptor
+
+Implement:
+
+```ts
+MetaEventInterceptor
+```
+
+It must:
+
+1. inspect handler metadata
+2. resolve dataset
+3. execute the original handler
+4. receive the successful result
+5. construct the Meta event
+6. send or queue the Meta event
+7. return the original controller result unchanged
+
+If the controller throws:
+
+```text
+do not send Meta event
+```
+
+The interceptor must not alter the controller's normal exception behavior.
+
+---
+
+# 13. Meta API Failure Must Not Normally Fail the Business Request
+
+Example:
+
+```text
+createLead()
+    ↓
+database insert succeeds
+    ↓
+lead exists
+    ↓
+Meta CAPI unavailable
+```
+
+The HTTP request should normally remain successful.
+
+Meta delivery failure should be handled separately.
+
+Therefore provide a configuration:
+
+```ts
+delivery: {
+  mode: 'async'
+}
+```
+
+with async being the recommended production mode.
+
+Also support:
+
+```ts
+delivery: {
+  mode: 'sync'
+}
+```
+
+for users who explicitly want synchronous behavior.
+
+Document the tradeoff.
+
+---
+
+# 14. Event Mapping
+
+Allow values to be mapped from the successful handler result.
+
+Example:
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+
+  eventId: (result) => result.id,
+
+  user: (result) => ({
+    email: result.email,
+    phone: result.phone,
+  }),
+
+  customData: (result) => ({
+    content_name: 'Tutor Request',
+  }),
+})
+```
+
+The mapping functions must receive:
+
+```ts
+result
+request
+context
+```
+
+where useful.
+
+Example conceptual API:
+
+```ts
+type MetaEventMapper<TResponse> = (
+  result: TResponse,
+  request: Request,
+  context: ExecutionContext,
+) => ...
+```
+
+---
+
+# 15. Event ID
+
+Event ID must be supported as a first-class concept.
+
+Allow:
+
+```ts
+eventId: (result) => result.id
+```
+
+or:
+
+```ts
+eventId: 'id'
+```
+
+or:
+
+```ts
+eventId: () => randomUUID()
+```
+
+If the user explicitly supplies an event ID, never replace it.
+
+Event ID must be propagated to Meta's `event_id`.
+
+Explain in documentation that the same event ID can be used by browser Pixel and server CAPI implementations for event deduplication.
+
+---
+
+# 16. Request Context
+
+The package must automatically make the incoming HTTP request available to the underlying Meta SDK.
+
+Use the official SDK's request-context functionality.
+
+Do not independently reimplement extraction of:
+
+* `fbp`
+* `fbc`
+* client IP
+* event source URL
+* referrer URL
+
+unless required as a fallback.
+
+The underlying official SDK already provides a Conversions API Parameter Builder for this purpose.
+
+Support both:
+
+```text
+Express request
+```
+
+and:
+
+```text
+Fastify request
+```
+
+through an internal request abstraction/adapter.
+
+---
+
+# 17. User Data
+
+Support:
+
+```ts
+user: {
+  email: ...
+  phone: ...
+  externalId: ...
+}
+```
+
+and eventually other Meta-supported user-data fields.
+
+Do not manually hash fields that the official SDK already normalizes/hashes unless the SDK requires it.
+
+Avoid double hashing.
+
+The package should clearly document which values are passed to the official SDK and which transformations are delegated to it.
+
+---
+
+# 18. Custom Data
+
+Support:
+
+```ts
+customData: {
+  currency: 'BDT',
+  value: 1000,
+  contentName: 'Tutor Request',
+}
+```
+
+Provide TypeScript types.
+
+Where practical, map friendly camelCase names to Meta SDK/API representations.
+
+Example:
+
+```ts
+contentName
+```
+
+→
+
+```text
+content_name
+```
+
+Do not expose raw SDK internals unnecessarily.
+
+---
+
+# 19. Generic Service API
+
+Decorators are optional.
+
+The package must also expose a service:
+
+```ts
+@Injectable()
+export class MetaCapiService {}
+```
+
+Example:
+
+```ts
+await this.metaCapi.track({
+  dataset: 'tutoria',
+  eventName: 'Lead',
+  request,
+  eventId: lead.id,
+  userData: {
+    email: lead.email,
+  },
+  customData: {
+    contentName: 'Tutor Request',
+  },
+});
+```
+
+This allows users to send events from:
+
+* services
+* background jobs
+* scheduled jobs
+* queues
+* message consumers
+* non-controller code
+
+---
+
+# 20. Typed Convenience Methods
+
+Optionally provide:
+
+```ts
+trackLead()
+trackPurchase()
+trackCompleteRegistration()
+trackContact()
+trackViewContent()
+trackInitiateCheckout()
+```
+
+But do not make these the primary architecture.
+
+The generic:
+
+```ts
+track()
+```
+
+must remain available.
+
+Avoid creating dozens of redundant wrappers.
+
+---
+
+# 21. Direct SDK Escape Hatch
+
+Advanced users should be able to access the underlying Meta SDK where necessary.
+
+For example:
+
+```ts
+this.metaCapi.getClient('tutoria')
+```
+
+or another carefully designed API.
+
+Do not force every possible Meta feature through your abstraction.
+
+The package should be an integration layer, not a replacement for Meta's SDK.
+
+---
+
+# 22. Configuration Validation
+
+Validate configuration at application startup.
+
+Detect:
+
+* missing dataset ID
+* missing access token
+* duplicate dataset names
+* invalid configuration
+* invalid retry configuration
+* unsupported delivery mode
+
+Errors should be descriptive.
+
+Example:
+
+```text
+MetaCapi configuration error:
+Dataset "tutoria" is missing "accessToken".
+```
+
+Never log access tokens.
+
+---
+
+# 23. Environment Variables
+
+Do not require environment variables directly inside the package.
+
+Allow applications to use NestJS `ConfigService`.
+
+The package must support:
+
+```ts
+forRootAsync()
+```
+
+as the recommended production configuration method.
+
+---
+
+# 24. Test Events
+
+Support Meta's `test_event_code`.
+
+Configuration:
+
+```ts
+datasets: {
+  tutoria: {
+    datasetId: '123',
+    accessToken: 'xxx',
+    testEventCode: 'TEST12345',
+  },
+}
+```
+
+Allow per-event override where appropriate.
+
+Provide a way to explicitly disable test event mode.
+
+Never accidentally send test event codes to production unless configured.
+
+---
+
+# 25. Retry System
+
+Implement configurable retries.
+
+Example:
+
+```ts
+retry: {
+  enabled: true,
+  maxAttempts: 3,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+}
+```
+
+Use exponential backoff.
+
+Only retry errors that are appropriate for retry.
+
+Do not blindly retry every error.
+
+Document retry behavior.
+
+---
+
+# 26. Queue Abstraction
+
+Do NOT make BullMQ a mandatory dependency.
+
+Create a queue abstraction:
+
+```ts
+interface MetaEventTransport {
+  send(event: MetaEventPayload): Promise<void>;
+}
+```
+
+Provide:
+
+```text
+ImmediateTransport
+```
+
+and optionally:
+
+```text
+BullMqTransport
+```
+
+as a separate optional integration package or optional dependency.
+
+The core package should remain lightweight.
+
+---
+
+# 27. Idempotency / Duplicate Protection
+
+The package must not invent its own duplicate event semantics.
+
+Meta's `event_id` should remain the primary deduplication mechanism.
+
+However, the package may provide optional application-level duplicate protection if implemented clearly.
+
+Do not silently modify event IDs.
+
+---
+
+# 28. Logging
+
+Provide a logger abstraction compatible with NestJS.
+
+Example:
+
+```ts
+logging: {
+  enabled: true,
+  level: 'error',
+}
+```
+
+Do not log:
+
+* access tokens
+* raw email addresses
+* raw phone numbers
+* unnecessary PII
+* authorization headers
+
+Events should be identifiable using:
+
+* dataset name
+* event name
+* event ID
+* Meta response status
+* request correlation ID where available
+
+---
+
+# 29. Error Model
+
+Define custom errors:
+
+```ts
+MetaCapiError
+MetaCapiConfigurationError
+MetaCapiValidationError
+MetaCapiDeliveryError
+MetaCapiRetryExhaustedError
+```
+
+Errors must preserve useful information without exposing secrets.
+
+---
+
+# 30. Decorator API Design
+
+Support:
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+})
+```
+
+```ts
+@MetaEvent({
+  name: 'Purchase',
+  dataset: 'marketing',
+})
+```
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+  eventId: result => result.id,
+})
+```
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+
+  user: result => ({
+    email: result.email,
+    phone: result.phone,
+  }),
+
+  customData: result => ({
+    contentName: 'Tutor Request',
+  }),
+})
+```
+
+Do not require users to manually construct Meta SDK `ServerEvent` objects for common use cases.
+
+---
+
+# 31. Controller-Level Defaults
+
+Support:
+
+```ts
+@MetaDataset('tutoria')
+@Controller('leads')
+export class LeadController {}
+```
+
+Then:
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+})
+```
+
+automatically uses `tutoria`.
+
+A method-level dataset must override it:
+
+```ts
+@MetaEvent({
+  name: 'Purchase',
+  dataset: 'marketing',
+})
+```
+
+---
+
+# 32. Param Decorator
+
+A `@MetaUser()` parameter decorator may be implemented, but it must not be required for normal operation.
+
+If implemented, it should be used for advanced cases such as:
+
+```ts
+async createLead(
+  @MetaUser() user: MetaUserContext,
+) {}
+```
+
+The primary architecture should keep Meta-specific concerns out of business logic.
+
+NestJS supports custom parameter decorators, so this is technically appropriate, but do not overuse it.
+
+---
+
+# 33. Important Decorator Rule
+
+Decorators must NOT execute the Meta API call at decoration time.
+
+The decorator should only attach metadata.
+
+Conceptually:
+
+```text
+@MetaEvent()
+      ↓
+metadata
+      ↓
+MetaEventInterceptor
+      ↓
+controller executes
+      ↓
+successful result
+      ↓
+Meta event
+```
+
+This must be covered by tests.
+
+---
+
+# 34. Response/Failure Behavior
+
+If:
+
+```ts
+createLead()
+```
+
+throws:
+
+```text
+Meta event = NOT SENT
+```
+
+If:
+
+```ts
+createLead()
+```
+
+returns successfully:
+
+```text
+Meta event = queued/sent
+```
+
+If Meta itself fails:
+
+```text
+business operation = remains successful
+Meta delivery = retry/failure handling
+```
+
+unless the user explicitly configured synchronous/fail-request behavior.
+
+---
+
+# 35. Transaction Consideration
+
+Do not claim that the package provides database transaction guarantees.
+
+Document that:
+
+```text
+database transaction
+```
+
+and:
+
+```text
+Meta CAPI delivery
+```
+
+are separate systems.
+
+For strong reliability, recommend:
+
+```text
+database/outbox
+       ↓
+queue
+       ↓
+Meta CAPI
+```
+
+as an advanced architecture.
+
+---
+
+# 36. Package Structure
+
+Use a professional structure similar to:
+
+```text
+src/
+├── decorators/
+│   ├── meta-event.decorator.ts
+│   └── meta-dataset.decorator.ts
+│
+├── interceptors/
+│   └── meta-event.interceptor.ts
+│
+├── services/
+│   └── meta-capi.service.ts
+│
+├── clients/
+│   └── meta-sdk.client.ts
+│
+├── builders/
+│   ├── event.builder.ts
+│   ├── user-data.builder.ts
+│   └── custom-data.builder.ts
+│
+├── transports/
+│   ├── meta-event.transport.ts
+│   └── immediate.transport.ts
+│
+├── adapters/
+│   └── request-context.adapter.ts
+│
+├── config/
+│   ├── meta-capi.options.ts
+│   └── meta-capi.tokens.ts
+│
+├── errors/
+│   └── ...
+│
+├── types/
+│   └── ...
+│
+├── meta-capi.module.ts
+└── index.ts
+```
+
+Keep the public API deliberately small.
+
+---
+
+# 37. Public API
+
+The root `index.ts` must export only intentional public APIs.
+
+For example:
+
+```ts
+export {
+  MetaCapiModule,
+  MetaCapiService,
+  MetaEvent,
+  MetaDataset,
+};
+```
+
+and public configuration/types.
+
+Do not expose internal implementation classes unless necessary.
+
+---
+
+# 38. Dependency Management
+
+The official Meta SDK should be a direct dependency.
+
+Example:
+
+```json
+{
+  "dependencies": {
+    "facebook-nodejs-business-sdk": "^..."
+  }
+}
+```
+
+NestJS dependencies should use appropriate peer dependency strategy where possible.
+
+Avoid unnecessary runtime dependencies.
+
+Do not bundle the entire NestJS framework into the package.
+
+---
+
+# 39. TypeScript Build
+
+Use a proper library build.
+
+The package must produce:
+
+```text
+dist/
+├── *.js
+├── *.d.ts
+└── *.js.map
+```
+
+Configure:
+
+```json
+{
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
+```
+
+Use an `exports` map.
+
+Ensure consumers cannot accidentally import internal source files.
+
+---
+
+# 40. Package.json
+
+Include:
+
+* name
+* version
+* description
+* keywords
+* repository
+* bugs
+* homepage
+* license
+* engines
+* main
+* types
+* exports
+* files
+* scripts
+
+Only publish:
+
+```text
+dist
+README.md
+LICENSE
+CHANGELOG.md
+package.json
+```
+
+and other intentionally required files.
+
+Do not publish:
+
+```text
+src tests .github coverage .env
+```
+
+unless intentionally needed.
+
+---
+
+# 41. README
+
+Create an excellent README.
+
+Sections:
+
+1. Overview
+2. Features
+3. Installation
+4. Requirements
+5. Quick Start
+6. Configuration
+7. Multiple Datasets
+8. `@MetaEvent`
+9. `@MetaDataset`
+10. Event Mapping
+11. Request Context
+12. User Data
+13. Custom Data
+14. Event IDs
+15. Test Events
+16. Async Delivery
+17. Retry
+18. Queue Integration
+19. Direct Service API
+20. Express/Fastify
+21. Error Handling
+22. Security
+23. Testing
+24. Development
+25. Release Process
+26. Contributing
+27. License
+
+Include real copy-paste examples.
+
+---
+
+# 42. Documentation Examples
+
+At minimum include:
+
+### Basic
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+})
+```
+
+### Multiple datasets
+
+```ts
+@MetaDataset('tutoria')
+```
+
+### Dataset override
+
+```ts
+@MetaEvent({
+  name: 'Purchase',
+  dataset: 'payments',
+})
+```
+
+### Event ID
+
+```ts
+eventId: result => result.id
+```
+
+### User mapping
+
+```ts
+user: result => ({
+  email: result.email,
+  phone: result.phone,
+})
+```
+
+### Custom data
+
+```ts
+customData: result => ({
+  currency: 'BDT',
+  value: result.amount,
+})
+```
+
+### Direct service
+
+```ts
+await metaCapi.track(...)
+```
+
+---
+
+# 43. Testing
+
+Use a professional testing strategy.
+
+Test:
+
+### Configuration
+
+* valid configuration
+* missing token
+* missing dataset
+* duplicate datasets
+* invalid options
+
+### Decorators
+
+* metadata exists
+* metadata is correct
+* dataset inheritance
+* method override
+
+### Interceptor
+
+* successful controller → event sent
+* controller exception → event not sent
+* result mapping works
+* event ID mapping works
+* user mapping works
+* custom data mapping works
+
+### Delivery
+
+* successful Meta response
+* Meta failure
+* retry
+* retry exhaustion
+* async mode
+* sync mode
+
+### Request Context
+
+Test:
+
+* Express
+* Fastify
+* fbp
+* fbc
+* IP
+* user agent
+* event source URL
+
+### Security
+
+Verify that secrets and PII are not logged.
+
+---
+
+# 44. Integration Test
+
+Create a mocked Meta SDK integration.
+
+Do NOT make the test suite dependent on live Meta credentials.
+
+Provide an optional live integration test that runs only when explicitly enabled:
+
+```text
+META_LIVE_TEST=true
+```
+
+Never run live Meta API tests automatically on pull requests.
+
+---
+
+# 45. GitHub Repository
+
+Create a professional GitHub repository.
+
+Repository should include:
+
+```text
+.github/
+├── workflows/
+│   ├── ci.yml
+│   ├── release.yml
+│   └── codeql.yml
+│
+├── dependabot.yml
+└── ISSUE_TEMPLATE/
+```
+
+Optionally add:
+
+```text
+CONTRIBUTING.md
+SECURITY.md
+CODE_OF_CONDUCT.md
+CHANGELOG.md
+```
+
+---
+
+# 46. GitHub CI
+
+On every pull request and push to main:
+
+```text
+install
+↓
+lint
+↓
+typecheck
+↓
+unit tests
+↓
+build
+↓
+package validation
+```
+
+Use a Node.js matrix for supported LTS versions.
+
+CI must fail if:
+
+* lint fails
+* TypeScript fails
+* tests fail
+* build fails
+* package cannot be packed
+
+---
+
+# 47. Code Quality
+
+Use:
+
+* ESLint
+* Prettier
+* TypeScript strict mode
+* consistent import ordering
+* no unused variables
+* no accidental `console.log`
+* no secrets committed
+
+Add:
+
+```bash
+npm run lint
+npm run format:check
+npm run typecheck
+npm test
+npm run build
+npm pack --dry-run
+```
+
+---
+
+# 48. Security
+
+Add:
+
+```text
+SECURITY.md
+```
+
+Document:
+
+* how to report vulnerabilities
+* never commit Meta access tokens
+* never put tokens in source code
+* never log access tokens
+* avoid logging PII
+* use environment/config management
+
+Run GitHub CodeQL.
+
+Enable Dependabot.
+
+---
+
+# 49. Release Strategy
+
+Use Semantic Versioning:
+
+```text
+MAJOR
+MINOR
+PATCH
+```
+
+Examples:
+
+```text
+1.0.0
+1.0.1
+1.1.0
+2.0.0
+```
+
+Breaking API changes require a major version.
+
+---
+
+# 50. Git Tags
+
+Release workflow should use tags:
+
+```text
+v1.0.0
+v1.0.1
+v1.1.0
+```
+
+When a valid release tag is pushed:
+
+```text
+GitHub Actions
+      ↓
+checkout
+      ↓
+install
+      ↓
+lint
+      ↓
+typecheck
+      ↓
+test
+      ↓
+build
+      ↓
+npm pack validation
+      ↓
+npm publish
+```
+
+Do not publish if validation fails.
+
+---
+
+# 51. npm Trusted Publishing
+
+Use npm Trusted Publishing through GitHub Actions/OIDC.
+
+Do NOT use a long-lived `NPM_TOKEN` unless there is a documented compatibility reason.
+
+The publishing workflow must request:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+Use npm's trusted publishing mechanism.
+
+Current npm documentation specifies GitHub Actions as a supported trusted publisher and requires the `id-token: write` permission. Trusted publishing also provides automatic provenance for eligible public packages.
+
+---
+
+# 52. Publish Workflow
+
+Create:
+
+```text
+.github/workflows/release.yml
+```
+
+Trigger:
+
+```yaml
+on:
+  push:
+    tags:
+      - 'v*'
+```
+
+The workflow should:
+
+1. checkout repository
+2. setup Node
+3. install dependencies
+4. run lint
+5. run typecheck
+6. run tests
+7. build
+8. run package validation
+9. publish to npm using trusted publishing
+
+Use a modern Node version supported by npm Trusted Publishing.
+
+npm currently documents Node 22.14+ and npm 11.5.1+ for trusted publishing. Verify these requirements again when implementing the workflow because npm may update them.
+
+---
+
+# 53. npm Provenance
+
+Enable npm provenance through trusted publishing.
+
+Do not manually add provenance flags if the current trusted publishing implementation automatically generates provenance.
+
+Verify the final package on npm has provenance information.
+
+npm documents provenance as cryptographic information linking the published package to its source and build process.
+
+---
+
+# 54. GitHub Release
+
+When a version tag is pushed, automatically create a GitHub Release.
+
+Release notes should be generated from commits/PRs where practical.
+
+Example:
+
+```text
+v1.2.0
+
+Features
+- Added multiple dataset support
+- Added @MetaDataset decorator
+
+Fixes
+- Fixed Fastify request context handling
+```
+
+---
+
+# 55. Version Validation
+
+The release workflow must verify:
+
+```text
+Git tag v1.2.3
+        ↓
+package.json version 1.2.3
+```
+
+If they differ:
+
+```text
+FAIL RELEASE
+```
+
+Do not publish mismatched versions.
+
+Also check whether that version is already published.
+
+---
+
+# 56. No Duplicate Publishing
+
+The release workflow must safely handle reruns.
+
+If version is already published:
+
+* do not publish a second time
+* fail with a clear explanation or safely skip as appropriate
+
+Never attempt to overwrite an existing npm version.
+
+---
+
+# 57. GitHub Actions Security
+
+Pin GitHub Actions to secure versions or commit SHAs where appropriate.
+
+Do not grant:
+
+```text
+write-all
+```
+
+permissions.
+
+Use least privilege.
+
+Only release workflow should receive:
+
+```text
+id-token: write
+```
+
+---
+
+# 58. Dependabot
+
+Configure Dependabot for:
+
+```text
+npm
+github-actions
+```
+
+Use a reasonable update schedule.
+
+---
+
+# 59. Example Application
+
+Create:
+
+```text
+examples/basic
+```
+
+and optionally:
+
+```text
+examples/multiple-datasets
+examples/fastify
+```
+
+The examples should demonstrate real usage.
+
+Do not require real credentials to compile/test examples.
+
+---
+
+# 60. Example: Multiple Dataset Application
+
+Demonstrate:
+
+```ts
+MetaCapiModule.forRoot({
+  datasets: {
+    tutoria: {
+      datasetId: '...',
+      accessToken: '...',
+    },
+
+    marketing: {
+      datasetId: '...',
+      accessToken: '...',
+    },
+  },
+})
+```
+
+Then:
+
+```ts
+@MetaDataset('tutoria')
+@Controller('leads')
+export class LeadController {
+  @Post()
+  @MetaEvent({
+    name: 'Lead',
+    eventId: result => result.id,
+  })
+  createLead() {}
+}
+```
+
+And:
+
+```ts
+@Controller('checkout')
+export class CheckoutController {
+  @Post()
+  @MetaEvent({
+    name: 'Purchase',
+    dataset: 'marketing',
+    eventId: result => result.id,
+  })
+  purchase() {}
+}
+```
+
+---
+
+# 61. Developer Experience Goal
+
+The simplest common implementation should require very little code.
+
+Desired:
+
+```ts
+@MetaEvent({
+  name: 'Lead',
+  eventId: result => result.id,
+})
+@Post()
+async createLead(@Body() dto: CreateLeadDto) {
+  return this.leadService.create(dto);
+}
+```
+
+The developer should NOT need to manually:
+
+```ts
+new ServerEvent()
+new UserData()
+new CustomData()
+new EventRequest()
+```
+
+for normal usage.
+
+The package handles that internally.
+
+---
+
+# 62. Advanced Developer Experience
+
+Advanced developers must still be able to control:
+
+* dataset
+* event ID
+* user data
+* custom data
+* event source URL
+* action source
+* test event code
+* request context
+* synchronous/asynchronous delivery
+* retry behavior
+
+Do not make the abstraction restrictive.
+
+---
+
+# 63. API Stability
+
+Do not expose internal Meta SDK classes in the public API unless necessary.
+
+The public API should be stable even if Meta changes internal SDK implementation.
+
+Use an internal adapter:
+
+```text
+MetaCapiService
+      ↓
+MetaSdkAdapter
+      ↓
+facebook-nodejs-business-sdk
+```
+
+This allows the underlying SDK version to change without requiring users to rewrite their NestJS application.
+
+---
+
+# 64. Documentation About Meta SDK
+
+Clearly state that:
+
+> This package is an independent NestJS integration and is not an official Meta or Facebook package unless the package owner has an official relationship with Meta.
+
+Do not imply endorsement by Meta.
+
+Mention that it is powered by Meta's official Node.js Business SDK.
+
+---
+
+# 65. License
+
+Use a permissive open-source license such as:
+
+```text
+MIT
+```
+
+unless another license is specifically desired.
+
+Include:
+
+```text
+LICENSE
+```
+
+and npm metadata.
+
+---
+
+# 66. Changelog
+
+Maintain:
+
+```text
+CHANGELOG.md
+```
+
+Use Keep a Changelog style where practical.
+
+---
+
+# 67. Git Commit Strategy
+
+Use conventional commits:
+
+```text
+feat:
+fix:
+docs:
+test:
+refactor:
+chore:
+ci:
+build:
+```
+
+Examples:
+
+```text
+feat: add multiple dataset support
+feat: add MetaEvent interceptor
+fix: handle Fastify request context
+ci: add npm trusted publishing
+```
+
+---
+
+# 68. Initial Development Sequence
+
+Build the project in this order:
+
+### Phase 1
+
+Project setup:
+
+* package
+* TypeScript
+* NestJS compatibility
+* ESLint
+* Prettier
+* Jest
+* build system
+
+### Phase 2
+
+Core Meta integration:
+
+* official Meta SDK
+* dataset configuration
+* service
+* SDK adapter
+
+### Phase 3
+
+NestJS integration:
+
+* decorators
+* metadata
+* interceptor
+* request context
+
+### Phase 4
+
+Event mapping:
+
+* event ID
+* user mapping
+* custom data mapping
+* dataset resolution
+
+### Phase 5
+
+Reliability:
+
+* async transport
+* retry
+* error handling
+* logging
+
+### Phase 6
+
+Testing:
+
+* unit tests
+* integration tests
+* Express/Fastify tests
+
+### Phase 7
+
+Documentation/examples.
+
+### Phase 8
+
+GitHub CI/security.
+
+### Phase 9
+
+npm release automation.
+
+---
+
+# 69. Acceptance Criteria
+
+The project is considered complete only when all of the following are true.
+
+## Functional
+
+* [ ] Meta official Node.js SDK is used
+* [ ] NestJS dynamic module exists
+* [ ] `forRoot()` works
+* [ ] `forRootAsync()` works
+* [ ] multiple datasets work
+* [ ] `@MetaDataset()` works
+* [ ] `@MetaEvent()` works
+* [ ] interceptor works
+* [ ] successful controller execution sends/queues event
+* [ ] failed controller execution does not send event
+* [ ] event ID mapping works
+* [ ] user mapping works
+* [ ] custom data mapping works
+* [ ] request context works
+* [ ] Express works
+* [ ] Fastify works
+* [ ] direct service API works
+* [ ] test event support works
+* [ ] retry support works
+* [ ] errors are handled correctly
+* [ ] access tokens are never logged
+
+## Quality
+
+* [ ] strict TypeScript
+* [ ] ESLint
+* [ ] Prettier
+* [ ] unit tests
+* [ ] integration tests
+* [ ] code coverage target defined
+* [ ] build succeeds
+* [ ] npm package contents verified
+* [ ] no unnecessary dependencies
+* [ ] public API documented
+
+## GitHub
+
+* [ ] repository created
+* [ ] README
+* [ ] LICENSE
+* [ ] CHANGELOG
+* [ ] CONTRIBUTING
+* [ ] SECURITY
+* [ ] CI workflow
+* [ ] CodeQL
+* [ ] Dependabot
+* [ ] release workflow
+
+## npm
+
+* [ ] package builds
+* [ ] package can be installed
+* [ ] npm metadata correct
+* [ ] trusted publishing configured
+* [ ] OIDC configured
+* [ ] provenance enabled
+* [ ] GitHub release created automatically
+* [ ] tag/version mismatch prevents publishing
+* [ ] failed CI prevents publishing
+
+---
+
+# 70. Important Implementation Rules
+
+1. Do not reimplement Meta's CAPI protocol.
+2. Do not send events directly from decorator execution.
+3. Use NestJS interceptors for post-handler event execution.
+4. Do not send an event if the controller throws.
+5. Do not normally allow Meta delivery failure to break the successful business operation.
+6. Support multiple datasets from the beginning.
+7. Keep decorators declarative.
+8. Keep Meta-specific logic out of business services where possible.
+9. Keep the underlying Meta SDK replaceable through an adapter.
+10. Do not log PII or access tokens.
+11. Do not require BullMQ for the core package.
+12. Do not require live Meta credentials for tests.
+13. Do not publish automatically from arbitrary pushes to `main`.
+14. Publish only validated release tags.
+15. Use npm Trusted Publishing/OIDC rather than a long-lived npm token.
+16. Generate npm provenance.
+17. Keep the public API small and stable.
+18. Write comprehensive documentation.
+19. Test both Express and Fastify.
+20. Treat this as a production open-source package, not a demo.
+
+---
+
+# 71. Final Deliverables
+
+The coding agent must produce:
+
+```text
+Complete source code
+Complete TypeScript build
+Complete tests
+Complete README
+CHANGELOG.md
+LICENSE
+CONTRIBUTING.md
+SECURITY.md
+GitHub Actions CI
+GitHub Actions release workflow
+CodeQL workflow
+Dependabot configuration
+Examples
+npm package configuration
+Trusted publishing configuration/documentation
+```
+
+It must leave the repository in a state where a maintainer can:
+
+```bash
+git clone <repository>
+cd <repository>
+npm ci
+npm test
+npm run lint
+npm run typecheck
+npm run build
+```
+
+and everything succeeds.
+
+A maintainer should then be able to create:
+
+```text
+v1.0.0
+```
+
+and have GitHub Actions validate, build, publish the package to npm using trusted publishing, generate npm provenance, and create the corresponding GitHub Release.
+
+Before considering the implementation complete, inspect the generated package with:
+
+```bash
+npm pack --dry-run
+```
+
+and verify that no source files, tests, secrets, `.env` files, credentials, or development-only artifacts are unintentionally included.
