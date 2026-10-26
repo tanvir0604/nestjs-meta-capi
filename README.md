@@ -166,6 +166,7 @@ MetaCapiModule.forRoot({
   retry: { enabled: true, maxAttempts: 3, initialDelayMs: 500, maxDelayMs: 10_000 },
   logging: { enabled: true, level: 'error' },
   cookies: { enabled: false },
+  graphApiVersion: 'v26.0', // optional; defaults to 'v26.0'
 });
 ```
 
@@ -181,6 +182,7 @@ MetaCapiModule.forRoot({
 | `logging.enabled`      | `boolean`                               | `true`    |                                                                |
 | `logging.level`        | `'debug' \| 'log' \| 'warn' \| 'error'` | `'error'` |                                                                |
 | `cookies.enabled`      | `boolean`                               | `false`   | Write `_fbc`/`_fbp` back as first-party cookies (see below).   |
+| `graphApiVersion`      | `string`                                | `'v26.0'` | Graph API version used for sends. Must look like `v26.0`.      |
 
 Invalid configuration fails fast at startup with an actionable `MetaCapiConfigurationError`. Access
 tokens never appear in an error message.

@@ -53,6 +53,8 @@ export interface MetaCapiModuleOptions {
   retry?: RetryOptions;
   logging?: LoggingOptions;
   cookies?: CookieOptions;
+  /** Graph API version for sends, e.g. `v26.0` (default). */
+  graphApiVersion?: string;
 }
 
 /** A dataset with its name and defaults applied. */
@@ -87,6 +89,7 @@ export interface ResolvedMetaCapiOptions {
   retry: ResolvedRetryOptions;
   logging: ResolvedLoggingOptions;
   cookies: ResolvedCookieOptions;
+  graphApiVersion: string;
 }
 
 /** Options for `forRootAsync` (recommended in production, SPEC.md §5.1). */

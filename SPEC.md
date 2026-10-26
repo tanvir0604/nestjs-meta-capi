@@ -650,7 +650,9 @@ Run against the **installed, published** SDK (`facebook-nodejs-business-sdk@24.0
 - **PII hashing is already done** by the published SDK (`UserData.normalize()` returns 64-hex
   `em`/`ph`), so ADR-3 stands: pass raw values, never pre-hash.
 - **Graph API version is a process-global static** (`FacebookAdsApi.VERSION === 'v24.0'`), so it
-  cannot be pinned per dataset. Pin it by pinning the SDK dependency.
+  cannot be pinned per dataset. **Superseded:** `HttpServiceTransport` now rewrites the version
+  segment of the URL the SDK builds, so the Graph version is set by the module-wide
+  `graphApiVersion` option (default `v26.0`) independently of the pinned SDK.
 - **Correction:** `setRequestContext()`/`Preference` are **absent from every published npm
   release** — npm's highest version is `24.0.1`. They exist only on `main` (SDK 26.x). Treat the
   SDK's GitHub README as **ahead of** npm. Request-context extraction therefore uses the

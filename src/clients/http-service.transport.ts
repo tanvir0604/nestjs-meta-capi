@@ -27,6 +27,11 @@ const asString = (value: unknown): string => (typeof value === 'string' ? value 
 const asStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
+/** Graph API version used for sends; the SDK itself is pinned to `v24.0`. */
+export const DEFAULT_GRAPH_API_VERSION = 'v26.0';
+
+const GRAPH_VERSION_SEGMENT = /\/v\d+\.\d+(?=\/)/;
+
 /**
  * Default send path for the package (ADR-1).
  *
@@ -40,7 +45,10 @@ const asStringArray = (value: unknown): string[] =>
  * of `EventRequest.execute()` — so this MUST resolve to an `EventResponse`.
  */
 export class HttpServiceTransport implements HttpServiceInterface {
-  constructor(private readonly execute: MetaHttpExecutor) {}
+  constructor(
+    private readonly execute: MetaHttpExecutor,
+    private readonly graphApiVersion: string = DEFAULT_GRAPH_API_VERSION,
+  ) {}
 
   async executeRequest(
     url: string,
@@ -48,7 +56,9 @@ export class HttpServiceTransport implements HttpServiceInterface {
     headers: Record<string, string>,
     params: Record<string, unknown>,
   ): Promise<EventResponse> {
-    const response = await this.execute({ url, method, headers, params });
+    // The published SDK hardcodes its Graph version (`v24.0`); rewrite it here.
+    const versionedUrl = url.replace(GRAPH_VERSION_SEGMENT, `/${this.graphApiVersion}`);
+    const response = await this.execute({ url: versionedUrl, method, headers, params });
     const body =
       response.body !== null && typeof response.body === 'object'
         ? (response.body as Record<string, unknown>)

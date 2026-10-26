@@ -17,7 +17,7 @@ const successBody = {
 };
 
 describe('HttpServiceTransport', () => {
-  it('forwards the request untouched and resolves an EventResponse', async () => {
+  it('forwards the request (at the default Graph version) and resolves an EventResponse', async () => {
     const seen: MetaHttpRequest[] = [];
     const transport = new HttpServiceTransport(async (request) => {
       seen.push(request);
@@ -32,12 +32,29 @@ describe('HttpServiceTransport', () => {
     );
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.url).toBe('https://graph.facebook.com/v24.0/pixel-a/events');
+    expect(seen[0]?.url).toBe('https://graph.facebook.com/v26.0/pixel-a/events');
     expect(seen[0]?.params.access_token).toBe('token-a');
     expect(result).toBeInstanceOf(EventResponse);
     expect(result.events_received).toBe(1);
     expect(result.fbtrace_id).toBe('trace-1');
     expect(result.num_processed_entries).toBe(1);
+  });
+
+  it('rewrites the Graph API version to a configured one', async () => {
+    const seen: MetaHttpRequest[] = [];
+    const transport = new HttpServiceTransport(async (request) => {
+      seen.push(request);
+      return { status: 200, body: successBody };
+    }, 'v27.0');
+
+    await transport.executeRequest(
+      'https://graph.facebook.com/v24.0/pixel-a/events',
+      'POST',
+      {},
+      {},
+    );
+
+    expect(seen[0]?.url).toBe('https://graph.facebook.com/v27.0/pixel-a/events');
   });
 
   it('throws MetaCapiDeliveryError on a non-2xx response', async () => {

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
+### Added
+
+- `graphApiVersion` module option. Sends now target Graph API `v26.0` by default; the published
+  SDK (`24.0.1`) hardcodes `v24.0`, so the transport rewrites the version in the request URL.
+
+### Changed
+
+- Pinned `typescript` to `^6.0.3` (TypeScript 7 is not yet supported by `ts-jest` and
+  `typescript-eslint`) and set `ignoreDeprecations: "6.0"` for the declaration build.
+
 ## [1.0.0] - 2026-09-29
 
 ### Added
@@ -29,5 +41,6 @@ All notable changes to this project are documented here. The format is based on
 - Express and Fastify integration tests.
 - A compile-checked example app under `examples/basic`.
 
-[Unreleased]: https://github.com/tanvir0604/nestjs-meta-capi/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tanvir0604/nestjs-meta-capi/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/tanvir0604/nestjs-meta-capi/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/tanvir0604/nestjs-meta-capi/releases/tag/v1.0.0

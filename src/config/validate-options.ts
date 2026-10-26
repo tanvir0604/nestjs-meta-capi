@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 
+import { DEFAULT_GRAPH_API_VERSION } from '../clients/http-service.transport';
 import { MetaCapiConfigurationError } from '../errors/meta-capi.error';
 import type {
   DatasetConfig,
@@ -151,6 +152,13 @@ export function resolveOptions(options: MetaCapiModuleOptions): ResolvedMetaCapi
     );
   }
 
+  const graphApiVersion = options.graphApiVersion ?? DEFAULT_GRAPH_API_VERSION;
+  if (typeof graphApiVersion !== 'string' || !/^v\d+\.\d+$/.test(graphApiVersion)) {
+    throw new MetaCapiConfigurationError(
+      `MetaCapi configuration error: "graphApiVersion" must look like "v26.0" (got ${String(graphApiVersion)}).`,
+    );
+  }
+
   const resolved: ResolvedMetaCapiOptions = {
     datasets: resolvedDatasets,
     defaultDataset,
@@ -158,6 +166,7 @@ export function resolveOptions(options: MetaCapiModuleOptions): ResolvedMetaCapi
     retry,
     logging: { enabled: options.logging?.enabled ?? DEFAULTS.logging.enabled, level },
     cookies: { enabled: options.cookies?.enabled ?? false },
+    graphApiVersion,
   };
 
   warnOnProductionTestEventCode(resolved);

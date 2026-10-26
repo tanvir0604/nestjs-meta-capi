@@ -34,9 +34,12 @@ function createCoreProviders(): Provider[] {
     },
     {
       provide: META_CAPI_ADAPTER,
-      useFactory: (logger: MetaCapiLogger): MetaSdkAdapter =>
-        new BusinessSdkAdapter(new HttpServiceTransport(createFetchExecutor()), logger),
-      inject: [META_CAPI_LOGGER],
+      useFactory: (logger: MetaCapiLogger, options: ResolvedMetaCapiOptions): MetaSdkAdapter =>
+        new BusinessSdkAdapter(
+          new HttpServiceTransport(createFetchExecutor(), options.graphApiVersion),
+          logger,
+        ),
+      inject: [META_CAPI_LOGGER, META_CAPI_OPTIONS],
     },
     {
       provide: META_CAPI_PARAM_BUILDER_FACTORY,
