@@ -1,6 +1,6 @@
 {
   "name": "nestjs-meta-capi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Idiomatic NestJS integration for the Meta Conversions API, powered by Meta's official Node.js Business SDK.",
   "keywords": [
     "nestjs",
@@ -95,7 +95,7 @@
     "supertest": "^7.3.0",
     "ts-jest": "^29.2.5",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0"
   }
 }

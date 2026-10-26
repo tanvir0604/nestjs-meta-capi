@@ -17,7 +17,7 @@ export function createFetchExecutor(): MetaHttpExecutor {
 
     const response = await fetch(url, init);
 
-    let body: unknown = {};
+    let body: unknown;
     try {
       body = await response.json();
     } catch {
