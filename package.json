@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "capi-param-builder-nodejs": "^1.3.2",
-    "facebook-nodejs-business-sdk": "^24.0.1"
+    "facebook-nodejs-business-sdk": "^26.0.3"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.0.0 || ^12.0.0",
